@@ -122,15 +122,25 @@ public class QueryApplication implements SparkApplication, Function {
         "/cql",
         APPLICATION_JSON,
         (req, res) -> {
-          String transformerId = req.queryParams("transform");
+          CqlRequest cqlRequest = mapper.readValue(util.safeGetBody(req), CqlRequest.class);
+          CqlQueryResponse cqlQueryResponse = executeCqlQuery(cqlRequest);
+          return mapper.toJson(cqlQueryResponse);
+        });
+
+    after(
+        "/cql",
+        (req, res) -> {
+          res.header("Content-Encoding", "gzip");
+        });
+
+    post(
+        "/cql/transform/:transformerId",
+        (req, res) -> {
+          String transformerId = req.params(":transformerId");
           String body = util.safeGetBody(req);
           CqlRequest cqlRequest = mapper.readValue(body, CqlRequest.class);
-          CqlQueryResponse cqlQueryResponse = executeCqlQuery(cqlRequest);
+          executeCqlQuery(cqlRequest);
 
-          if (StringUtils.isEmpty(transformerId)) {
-            LOGGER.trace("Returning cql query response.");
-            return mapper.toJson(cqlQueryResponse);
-          }
           for (ServiceReference<QueryResponseTransformer> queryResponseTransformer :
               queryResponseTransformers) {
 
@@ -138,65 +148,58 @@ public class QueryApplication implements SparkApplication, Function {
 
             String id = (String) queryResponseTransformer.getProperty("id");
 
-            if (!id.equals(transformerId)) {
-              continue;
-            }
+            if (id.equals(transformerId)) {
+              BinaryContent content =
+                  bundleContext
+                      .getService(queryResponseTransformer)
+                      .transform(this.queryResponse, new HashMap<>());
 
-            BinaryContent content =
-                bundleContext
-                    .getService(queryResponseTransformer)
-                    .transform(this.queryResponse, new HashMap<>());
+              String mimeType = (String) queryResponseTransformer.getProperty("mime-type");
+              MimeTypes allTypes = MimeTypes.getDefaultMimeTypes();
+              String fileExt = allTypes.forName(mimeType).getExtension();
 
-            String mimeType = (String) queryResponseTransformer.getProperty("mime-type");
-            MimeTypes allTypes = MimeTypes.getDefaultMimeTypes();
-            String fileExt = allTypes.forName(mimeType).getExtension();
+              res.status(200);
 
-            res.status(200);
+              String acceptEncoding = req.headers("Accept-Encoding");
 
-            String acceptEncoding = req.headers("Accept-Encoding");
+              boolean shouldGzip =
+                  StringUtils.isNotBlank(acceptEncoding)
+                      && acceptEncoding.toLowerCase().contains("gzip");
 
-            boolean shouldGzip =
-                StringUtils.isNotBlank(acceptEncoding)
-                    && acceptEncoding.toLowerCase().contains("gzip");
-
-            if (!shouldGzip) {
-              LOGGER.trace("Request header does not contain gzip.");
-            }
-
-            res.type(mimeType);
-            String attachment =
-                String.format("attachment;filename=export-%s%s", Instant.now().toString(), fileExt);
-            res.header("Content-Disposition", attachment);
-
-            if (shouldGzip) {
-              res.raw().addHeader("Content-Encoding", "gzip");
-            }
-
-            try (OutputStream servletOutputStream = res.raw().getOutputStream();
-                InputStream resultStream = content.getInputStream()) {
-              if (shouldGzip) {
-                try (OutputStream gzipServletOutputStream =
-                    new GZIPOutputStream(servletOutputStream)) {
-                  IOUtils.copy(resultStream, gzipServletOutputStream);
-                }
-              } else {
-                IOUtils.copy(resultStream, servletOutputStream);
+              if (!shouldGzip) {
+                LOGGER.trace("Request header does not contain gzip.");
               }
+
+              res.type(mimeType);
+              String attachment =
+                  String.format(
+                      "attachment;filename=export-%s%s", Instant.now().toString(), fileExt);
+              res.header("Content-Disposition", attachment);
+
+              if (shouldGzip) {
+                res.raw().addHeader("Content-Encoding", "gzip");
+              }
+
+              try (OutputStream servletOutputStream = res.raw().getOutputStream();
+                  InputStream resultStream = content.getInputStream()) {
+                if (shouldGzip) {
+                  try (OutputStream gzipServletOutputStream =
+                      new GZIPOutputStream(servletOutputStream)) {
+                    IOUtils.copy(resultStream, gzipServletOutputStream);
+                  }
+                } else {
+                  IOUtils.copy(resultStream, servletOutputStream);
+                }
+              }
+
+              LOGGER.trace("Response sent in {} file format.", fileExt);
+
+              return "";
             }
-
-            LOGGER.trace("Response sent in {} file format.", fileExt);
-
-            return "";
           }
           LOGGER.debug("Could not find transformer id: {} to match cql request.", transformerId);
           res.status(404);
           return mapper.toJson(ImmutableMap.of("message", "Service not found"));
-        });
-
-    after(
-        "/cql",
-        (req, res) -> {
-          res.header("Content-Encoding", "gzip");
         });
 
     get(
