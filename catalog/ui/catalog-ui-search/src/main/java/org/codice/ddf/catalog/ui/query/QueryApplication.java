@@ -88,8 +88,6 @@ public class QueryApplication implements SparkApplication, Function {
 
   private FeatureService featureService;
 
-  private QueryResponse queryResponse;
-
   private List<ServiceReference> queryResponseTransformers;
 
   private BundleContext bundleContext;
@@ -101,7 +99,8 @@ public class QueryApplication implements SparkApplication, Function {
               .includeEmpty()
               .includeNulls()
               .includeDefaultValues()
-              .setJsonFormatForDates(false));
+              .setJsonFormatForDates(false)
+              .useAnnotations());
 
   private EndpointUtil util;
 
@@ -139,7 +138,7 @@ public class QueryApplication implements SparkApplication, Function {
           String transformerId = req.params(":transformerId");
           String body = util.safeGetBody(req);
           CqlRequest cqlRequest = mapper.readValue(body, CqlRequest.class);
-          executeCqlQuery(cqlRequest);
+          CqlQueryResponse cqlQueryResponse = executeCqlQuery(cqlRequest);
 
           for (ServiceReference<QueryResponseTransformer> queryResponseTransformer :
               queryResponseTransformers) {
@@ -152,7 +151,7 @@ public class QueryApplication implements SparkApplication, Function {
               BinaryContent content =
                   bundleContext
                       .getService(queryResponseTransformer)
-                      .transform(this.queryResponse, new HashMap<>());
+                      .transform(cqlQueryResponse.getQueryResponse(), new HashMap<>());
 
               String mimeType = (String) queryResponseTransformer.getProperty("mime-type");
               MimeTypes allTypes = MimeTypes.getDefaultMimeTypes();
@@ -325,8 +324,6 @@ public class QueryApplication implements SparkApplication, Function {
                 .orElse(Collections.emptyMap()));
 
     stopwatch.stop();
-
-    this.queryResponse = response;
 
     return new CqlQueryResponse(
         cqlRequest.getId(),
