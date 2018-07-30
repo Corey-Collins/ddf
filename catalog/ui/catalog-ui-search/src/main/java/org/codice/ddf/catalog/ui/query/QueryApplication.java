@@ -184,13 +184,11 @@ public class QueryApplication implements SparkApplication, Function {
               }
             }
 
-            LOGGER.trace(String.format("Response sent in %s file format.", fileExt));
+            LOGGER.trace("Response sent in {} file format.", fileExt);
 
             return "";
           }
-          LOGGER.debug(
-              String.format(
-                  "Could not find transformer id %s to match cql request.", transformerId));
+          LOGGER.debug("Could not find transformer id: {} to match cql request.", transformerId);
           res.status(404);
           return mapper.toJson(ImmutableMap.of("message", "Service not found"));
         });
