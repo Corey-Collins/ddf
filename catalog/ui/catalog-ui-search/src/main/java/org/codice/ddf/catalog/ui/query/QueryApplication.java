@@ -122,7 +122,7 @@ public class QueryApplication implements SparkApplication, Function {
         "/cql",
         APPLICATION_JSON,
         (req, res) -> {
-          String transformerId = req.queryParams(":transform");
+          String transformerId = req.queryParams("transform");
           String body = util.safeGetBody(req);
           CqlRequest cqlRequest = mapper.readValue(body, CqlRequest.class);
           CqlQueryResponse cqlQueryResponse = executeCqlQuery(cqlRequest);
