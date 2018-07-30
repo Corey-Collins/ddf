@@ -50,6 +50,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
+import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.lang.StringUtils;
 import org.apache.tika.mime.MimeTypes;
 import org.boon.json.JsonParserFactory;
@@ -159,15 +160,11 @@ public class QueryApplication implements SparkApplication, Function {
 
               res.status(200);
 
-              String acceptEncoding = req.headers("Accept-Encoding");
+              String acceptEncoding = req.headers(HttpHeaders.ACCEPT_ENCODING);
 
               boolean shouldGzip =
                   StringUtils.isNotBlank(acceptEncoding)
                       && acceptEncoding.toLowerCase().contains("gzip");
-
-              if (!shouldGzip) {
-                LOGGER.trace("Request header does not contain gzip.");
-              }
 
               res.type(mimeType);
               String attachment =
@@ -176,7 +173,8 @@ public class QueryApplication implements SparkApplication, Function {
               res.header("Content-Disposition", attachment);
 
               if (shouldGzip) {
-                res.raw().addHeader("Content-Encoding", "gzip");
+                res.header(HttpHeaders.CONTENT_ENCODING, "gzip");
+                LOGGER.trace("Request header accepts gzip");
               }
 
               try (OutputStream servletOutputStream = res.raw().getOutputStream();
