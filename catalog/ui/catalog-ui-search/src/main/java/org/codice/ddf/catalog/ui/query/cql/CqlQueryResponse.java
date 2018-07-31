@@ -51,7 +51,7 @@ public class CqlQueryResponse {
 
   private final Status status;
 
-  private QueryResponse queryResponse;
+  private final QueryResponse queryResponse;
 
   public CqlQueryResponse(
       String id,

@@ -191,7 +191,8 @@ public class QueryApplication implements SparkApplication, Function {
 
               LOGGER.trace("Response sent in {} file format.", fileExt);
 
-              return "";
+              final String responseBody = "";
+              return responseBody;
             }
           }
           LOGGER.debug("Could not find transformer id: {} to match cql request.", transformerId);
