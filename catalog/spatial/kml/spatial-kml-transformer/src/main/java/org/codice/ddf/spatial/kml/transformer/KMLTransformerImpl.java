@@ -84,6 +84,8 @@ public class KMLTransformerImpl implements KMLTransformer {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(KMLTransformerImpl.class);
 
+  private Boolean injectAttributes;
+
   @VisibleForTesting static final MimeType KML_MIMETYPE = new MimeType();
 
   private List<StyleSelector> defaultStyle;
@@ -198,7 +200,10 @@ public class KMLTransformerImpl implements KMLTransformer {
     } catch (IOException e) {
       LOGGER.debug("Failed to apply description Template", e);
     }
-    kmlPlacemark.setDescription(description);
+
+    if (injectAttributes) {
+      kmlPlacemark.setDescription(description);
+    }
 
     String styleUrl = styleMapper.getStyleForMetacard(entry);
     if (StringUtils.isNotBlank(styleUrl)) {
@@ -287,5 +292,9 @@ public class KMLTransformerImpl implements KMLTransformer {
     Geometry kmlGeo = getKmlGeoFromJtsGeo(jtsGeo);
     kmlGeo = addJtsGeoPointsToKmlGeo(jtsGeo, kmlGeo);
     return kmlGeo;
+  }
+
+  public void setInjectAttributes(Boolean injectAttributes) {
+    this.injectAttributes = injectAttributes;
   }
 }
