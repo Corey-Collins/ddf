@@ -210,9 +210,9 @@ public class KMLTransformerImpl implements KMLTransformer {
 
     if (injectAttributes) {
       kmlPlacemark.setDescription(description);
-    } else {
-      setExtendedData(kmlPlacemark, entry);
     }
+
+    setExtendedData(kmlPlacemark, entry);
 
     String styleUrl = styleMapper.getStyleForMetacard(entry);
     if (StringUtils.isNotBlank(styleUrl)) {
