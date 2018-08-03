@@ -24,6 +24,7 @@ import com.github.jknack.handlebars.Template;
 import com.github.jknack.handlebars.io.ClassPathTemplateLoader;
 import com.google.common.annotations.VisibleForTesting;
 import ddf.action.ActionProvider;
+import ddf.catalog.data.Attribute;
 import ddf.catalog.data.BinaryContent;
 import ddf.catalog.data.Metacard;
 import ddf.catalog.data.Result;
@@ -31,7 +32,9 @@ import ddf.catalog.data.impl.BinaryContentImpl;
 import ddf.catalog.data.impl.MetacardImpl;
 import ddf.catalog.operation.SourceResponse;
 import ddf.catalog.transform.CatalogTransformerException;
+import de.micromata.opengis.kml.v_2_2_0.Data;
 import de.micromata.opengis.kml.v_2_2_0.Document;
+import de.micromata.opengis.kml.v_2_2_0.ExtendedData;
 import de.micromata.opengis.kml.v_2_2_0.Feature;
 import de.micromata.opengis.kml.v_2_2_0.Geometry;
 import de.micromata.opengis.kml.v_2_2_0.Kml;
@@ -109,17 +112,21 @@ public class KMLTransformerImpl implements KMLTransformer {
 
   private KmlMarshaller kmlMarshaller;
 
+  private final Map<String, String> aliasMap;
+
   public KMLTransformerImpl(
       BundleContext bundleContext,
       String defaultStylingName,
       KmlStyleMap mapper,
       ActionProvider actionProvider,
-      KmlMarshaller kmlMarshaller) {
+      KmlMarshaller kmlMarshaller,
+      Map<String, String> aliasMap) {
 
     this.context = Validate.notNull(bundleContext, "BundleContext must not be null.");
     this.styleMapper = Validate.notNull(mapper, "KmlStyleMap must not be null.");
     this.templateHelper = new DescriptionTemplateHelper(actionProvider);
     this.kmlMarshaller = Validate.notNull(kmlMarshaller, "KmlMarshaller must not be null.");
+    this.aliasMap = aliasMap;
 
     final URL stylingUrl = context.getBundle().getResource(defaultStylingName);
 
@@ -203,6 +210,8 @@ public class KMLTransformerImpl implements KMLTransformer {
 
     if (injectAttributes) {
       kmlPlacemark.setDescription(description);
+    } else {
+      setExtendedData(kmlPlacemark, entry);
     }
 
     String styleUrl = styleMapper.getStyleForMetacard(entry);
@@ -211,6 +220,28 @@ public class KMLTransformerImpl implements KMLTransformer {
     }
 
     return kmlPlacemark;
+  }
+
+  private void setExtendedData(Placemark placemark, Metacard metacard) {
+    final ExtendedData extendedData = new ExtendedData();
+
+    for (String attributeName : aliasMap.keySet()) {
+      final Attribute attribute = metacard.getAttribute(attributeName);
+      if (attribute != null) {
+        final String attributeValue = (String) attribute.getValue();
+        final String attributeAlias = aliasMap.get(attributeName);
+        final Data data = getData(attributeAlias, attributeValue);
+        extendedData.addToData(data);
+      }
+    }
+
+    placemark.setExtendedData(extendedData);
+  }
+
+  private Data getData(String attributeAlias, String attributeValue) {
+    final Data data = new Data(attributeValue);
+    data.setName(attributeAlias);
+    return data;
   }
 
   @Override
